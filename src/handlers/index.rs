@@ -10,6 +10,7 @@ struct CreateInput {
     to_url: String,
     from_url: String,
     query: String,
+    version: i64,
 }
 
 #[post("/mapping/create")]
@@ -18,13 +19,14 @@ pub async fn add_new_mapping(
     input: web::Json<CreateInput>,
 ) -> impl Responder {
     let resp = sqlx::query(
-        "INSERT INTO gql_to_rest (name, method, to_url, from_url, query) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO gql_to_rest (name, method, to_url, from_url, query, version) VALUES (?, ?, ?, ?, ?, ?)",
     )
     .bind(&input.name)
     .bind(&input.method)
     .bind(&input.to_url)
     .bind(&input.from_url)
     .bind(&input.query)
+    .bind(input.version)
     .execute(db.get_ref())
     .await;
     let res_json = match resp {
@@ -48,12 +50,13 @@ pub async fn add_new_mapping(
 
 #[derive(Clone, Debug, FromRow, Serialize, Deserialize)]
 pub struct Mapping {
-    id: u64,
+    id: i64,
     pub name: String,
     pub method: String,
     pub to_url: String,
     pub from_url: String,
     pub query: String,
+    pub version: i64,
 }
 
 #[get("/mapping")]
@@ -84,10 +87,11 @@ pub async fn get_from_gql(
     db: web::Data<Pool<Sqlite>>,
     query: web::Query<QueryParam>,
 ) -> impl Responder {
-    let cfg_request = sqlx::query_as::<_, Mapping>("SELECT * FROM gql_to_rest WHERE name = ?")
-        .bind(&query.name)
-        .fetch_one(db.get_ref())
-        .await;
+    let cfg_request =
+        sqlx::query_as::<_, Mapping>("SELECT from_url, query FROM gql_to_rest WHERE name = ?")
+            .bind(&query.name)
+            .fetch_one(db.get_ref())
+            .await;
     if cfg_request.is_err() {
         return web::Json(json!({"success": false, "data":[]}));
     }

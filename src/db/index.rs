@@ -22,7 +22,8 @@ pub async fn migrate(db: &Pool<Sqlite>) -> Result<()> {
                     method TEXT NOT NULL,
                     from_url TEXT NOT NULL,
                     to_url TEXT NOT NULL,
-                    query TEXT NOT NULL
+                    query TEXT NOT NULL,
+                    version INTEGER NOT NULL
                 );",
     )
     .execute(db)
