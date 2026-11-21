@@ -77,6 +77,11 @@ pub async fn get_all_mappings(db: web::Data<Pool<Sqlite>>) -> impl Responder {
     web::Json(res_json)
 }
 
+#[derive(Clone, Debug, FromRow, Serialize, Deserialize)]
+pub struct RequestMapping {
+    pub from_url: String,
+    pub query: String,
+}
 #[derive(Deserialize)]
 struct QueryParam {
     name: String,
@@ -87,11 +92,12 @@ pub async fn get_from_gql(
     db: web::Data<Pool<Sqlite>>,
     query: web::Query<QueryParam>,
 ) -> impl Responder {
-    let cfg_request =
-        sqlx::query_as::<_, Mapping>("SELECT from_url, query FROM gql_to_rest WHERE name = ?")
-            .bind(&query.name)
-            .fetch_one(db.get_ref())
-            .await;
+    let cfg_request = sqlx::query_as::<_, RequestMapping>(
+        "SELECT from_url, query FROM gql_to_rest WHERE name = ?",
+    )
+    .bind(&query.name)
+    .fetch_one(db.get_ref())
+    .await;
     if cfg_request.is_err() {
         return web::Json(json!({"success": false, "data":[]}));
     }
@@ -117,11 +123,17 @@ pub async fn get_from_gql(
 
             let r = match serde_json::from_str(&res.unwrap()) {
                 Ok(json) => json,
-                Err(_) => json!({"success": false, "data": []}),
+                Err(e) => {
+                    println!("{:?}", e);
+                    json!({"success": false, "data": []})
+                }
             };
             json!({"success": true, "data": r})
         }
-        Err(_) => json!({"success": false, "data": []}),
+        Err(e) => {
+            println!("{:?}", e);
+            json!({"success": false, "data": []})
+        }
     };
     web::Json(s)
 }
