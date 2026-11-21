@@ -17,10 +17,12 @@ pub async fn run() -> Result<()> {
     let db = SqlitePool::connect(DB_URL).await?;
     migrate(&db).await?;
 
+    let client = reqwest::Client::new();
     let db_ref = web::Data::new(db);
     HttpServer::new(move || {
         App::new()
             .app_data(db_ref.clone())
+            .app_data(web::Data::new(client.clone()))
             .configure(handlers::config)
     })
     .bind(("0.0.0.0", 8080))?

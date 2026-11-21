@@ -1,6 +1,6 @@
 use actix_web::{Responder, get, post, web};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Map, Value, json};
 use sqlx::{Pool, Sqlite, prelude::FromRow};
 
 #[derive(Deserialize, Debug)]
@@ -86,11 +86,18 @@ pub struct RequestMapping {
 struct QueryParam {
     name: String,
 }
+#[derive(Deserialize)]
+struct RequestBody {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    variables: Option<Map<String, Value>>,
+}
 
-#[get("/request")]
+#[post("/request")]
 pub async fn get_from_gql(
     db: web::Data<Pool<Sqlite>>,
     query: web::Query<QueryParam>,
+    body: web::Json<RequestBody>,
+    client: web::Data<reqwest::Client>,
 ) -> impl Responder {
     let cfg_request = sqlx::query_as::<_, RequestMapping>(
         "SELECT from_url, query FROM gql_to_rest WHERE name = ?",
@@ -102,10 +109,9 @@ pub async fn get_from_gql(
         return web::Json(json!({"success": false, "data":[]}));
     }
     let cfg_request_unwrapped = cfg_request.unwrap();
-    let client = reqwest::Client::new();
     let body = json!({
         "query": cfg_request_unwrapped.query,
-        "variables":{}
+        "variables": &body.variables
     })
     .to_string();
     let result = client
